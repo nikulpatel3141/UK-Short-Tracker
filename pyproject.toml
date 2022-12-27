@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=63.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uk_short_tracker"
+dynamic = ["version"]
+description = "Track disclosed UK shorts"
+readme = "README.rst"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "requests",
+    "tenacity",
+    "pandas",
+]
+
