@@ -18,7 +18,7 @@ def check_cur_hist_discl_overlap(cur_discl, hist_discl) -> bool:
     return overlap_ind.any()
 
 
-def reindex_discl_data(
+def ffill_fund_discl_data(
     discl_data: pd.Series,
     max_date: Union[date, None],
     discl_threshold: float,
@@ -33,12 +33,34 @@ def reindex_discl_data(
     max date in the data instead.
     """
     idx = discl_data.index
-    tgt_idx = pd.bdate_range(idx.min(), max_date)
+
+    if not max_date:
+        max_date = idx.max()
+
+    tgt_idx = pd.bdate_range(idx.min(), max_date, name=idx.name)
     reindexed_data = discl_data.reindex(tgt_idx)
 
     data_ffill = reindexed_data.ffill()
     data_ffill = data_ffill.where(data_ffill >= discl_threshold)
     return reindexed_data.fillna(data_ffill)
+
+
+def ffill_discl_data(
+    discl_data: pd.DataFrame,
+    max_date: Union[date, None],
+    discl_threshold: float,
+) -> pd.DataFrame:
+    """Same as ffill_fund_discl_data but for multiple funds"""
+    ffill_discl_data_ = lambda x: ffill_fund_discl_data(
+        x.set_index(DATE_COL),
+        max_date=max_date,
+        discl_threshold=discl_threshold,
+    )
+    return (
+        discl_data.groupby([FUND_COL, SHARE_ISSUER_COL, ISIN_COL])
+        .apply(ffill_discl_data_)
+        .reset_index()
+    )
 
 
 def remove_dupl_shorts(discl_df: pd.DataFrame) -> pd.DataFrame:
@@ -60,7 +82,7 @@ def remove_dupl_shorts(discl_df: pd.DataFrame) -> pd.DataFrame:
     discl_df_ = discl_df.drop_duplicates()
     prim_key_cols = [FUND_COL, SHARE_ISSUER_COL, ISIN_COL, DATE_COL]
 
-    dupl_rows = discl_df_.duplicated(subset=prim_key_cols)
+    dupl_rows = discl_df_.duplicated(subset=prim_key_cols, keep=False)
     num_dupl_rows = dupl_rows.sum()
 
     if num_dupl_rows:
@@ -69,5 +91,5 @@ def remove_dupl_shorts(discl_df: pd.DataFrame) -> pd.DataFrame:
             f"{discl_df_.loc[dupl_rows].to_string()}"
         )
         logger.warning("Assuming the max disclosure is correct...")
-        return discl_df_.groupby(prim_key_cols).max()
-    return discl_df_
+        discl_df_ = discl_df_.groupby(prim_key_cols).max()
+    return discl_df_.reset_index()

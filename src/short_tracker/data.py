@@ -174,7 +174,7 @@ def parse_uk_si_discl_data(data: pd.DataFrame) -> pd.DataFrame:
 
     if missing_cols:
         raise ValueError(f"Missing columns in returned disclosure data: {missing_cols}")
-    return data.drop_duplicates().rename(columns=col_map)
+    return data.rename(columns=col_map)
 
 
 def query_uk_si_disclosures(discl_url: str, exp_upd_datetime: datetime = None):
