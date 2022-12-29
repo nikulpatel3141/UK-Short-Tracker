@@ -93,3 +93,24 @@ def remove_dupl_shorts(discl_df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Assuming the max disclosure is correct...")
         discl_df_ = discl_df_.groupby(prim_key_cols).max()
     return discl_df_.reset_index()
+
+
+def calc_fund_short_flow_bounds(
+    ffill_discl_data: pd.Series,
+    discl_threshold: float,
+):
+    """Calculate a lower bound for movement into/out of disclosed short positions.
+    If all funds are disclosed this is equivalent to .diff(), otherwise take into account
+    the threshold,
+
+    Examples:
+    - if a fund newly discloses a 0.8% short with a 0.5% threshold, then the
+    minimum flow is 0.3% since they could've been just under the threshold previously.
+    - if a fund covers a 0.8% short then the minimum flow is -0.3%
+    """
+    discl_diff = ffill_discl_data.diff()  # nan when boundary is crossed
+    threshold_discl = ffill_discl_data.where(
+        discl_diff.isna() & (ffill_discl_data >= discl_threshold)
+    )
+    threshold_cross_bound = threshold_discl - discl_threshold
+    return discl_diff.fillna(threshold_cross_bound).fillna(0)
