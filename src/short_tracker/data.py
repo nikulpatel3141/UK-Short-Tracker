@@ -1,11 +1,13 @@
 import time
 import requests
 import logging
-from pprint import pprint
 from datetime import datetime, time
 from dateutil.parser import parse
+from typing import Union
 
+from pandas_datareader import data as pdr
 from tenacity import retry, retry_if_exception_type, wait_fixed
+import yfinance as yf
 import pandas as pd
 
 SHORT_URL_UK = (
@@ -17,7 +19,7 @@ ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
 UK_MKT_EARLY_CLOSE = time(hour=12, minute=30)
 UK_DISCL_THRESHOLD = 0.5
 
-
+# Columns from UK's FCA short disclosures
 FUND_COL = "Position Holder"
 ISIN_COL = "ISIN"
 DATE_COL = "Position Date"
@@ -25,6 +27,13 @@ SHORT_POS_COL = "Net Short Position (%)"
 SHARE_ISSUER_COL = "Name of Share Issuer"
 
 EXP_DISCL_COLS = [FUND_COL, ISIN_COL, SHARE_ISSUER_COL, DATE_COL, SHORT_POS_COL]
+
+# Columns from Yahoo Finance
+TICKER_COL = "Ticker"
+CLOSE_COL = "Close"
+ADJ_CLOSE_COL = "Adj Close"
+VOLUME_COL = "Volume"
+
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
 OPENFIGI_HEADERS = {"Content-Type": "application/json"}
@@ -46,12 +55,15 @@ class NotUpdatedError(Exception):
     pass
 
 
-def query_sec_metadata(ids: list, id_type: str):
-    """Query OpenFIGI for the given ids for a single exchange.
+def query_sec_metadata(
+    ids: list,
+    query_params: dict,
+):
+    """Query OpenFIGI for the given ids
 
     Args:
-    - exchCode: code for the exchange the security is traded on, eg LN
-    - id_type: type of identifier used for ids, eg ID_ISIN
+    - ids: a list of identifiers of the same type to query data for
+    - query_params: type of identifier used for ids, eg {"idType": "ID_ISIN"}
 
     Returns: a dict of returned data with the originally queried ids as keys,
     and a list of ids returning an error
@@ -61,7 +73,7 @@ def query_sec_metadata(ids: list, id_type: str):
     #FIXME: allow passing an API key
     #FIXME: return specific errors for invalid ids
     """
-    payload = [{"idType": id_type, "idValue": id_} for id_ in ids]
+    payload = [{**query_params, "idValue": id_} for id_ in ids]
     req = requests.post(
         OPENFIGI_URL,
         json=payload,
@@ -90,7 +102,9 @@ def query_sec_metadata(ids: list, id_type: str):
     return sec_metadata, error_ids
 
 
-def query_all_sec_metadata(isins: list, id_type: str, max_jobsize=10, max_req_rate=25):
+def query_all_sec_metadata(
+    isins: list, query_params: dict, max_jobsize=10, max_req_rate=25
+):
     """Query OpenFIGI using query_sec_metadata for security metadata while respecting
     their API limit (defaults are for without an API key).
 
@@ -108,7 +122,7 @@ def query_all_sec_metadata(isins: list, id_type: str, max_jobsize=10, max_req_ra
         retry=retry_if_exception_type(APIRateLimitException), wait=wait_fixed(req_pause)
     )
     def query_func(id_subset):
-        return query_sec_metadata(id_subset, id_type)
+        return query_sec_metadata(id_subset, query_params)
 
     sec_metadata, error_ids = {}, []
 
@@ -214,3 +228,24 @@ def query_uk_si_disclosures(discl_url: str, exp_upd_datetime: datetime = None):
     parsed_data = [parse_uk_si_discl_data(df) for df in data.values()]
 
     return dict(zip(parsed_sheet_names, parsed_data)), rept_date
+
+
+def query_quotes(ticker: str) -> Union[pd.Series, None]:
+    """Query for a ticker's financial data, eg market cap etc using Pandas Datareader"""
+    try:
+        data = pdr.get_quote_yahoo(ticker)
+    except IndexError:
+        logger.warning(f"No quote data for ticker {ticker}")
+        return None
+    return data.squeeze()
+
+
+def query_mkt_data(ticker, start_date, adjust=False) -> Union[pd.DataFrame, None]:
+    """Query OHLC data from Yahoo Finance"""
+    ticker = yf.Ticker(ticker)
+    data = ticker.history(start=start_date, auto_adjust=adjust)
+    if data.empty:
+        logger.warning(f"No price data for ticker {ticker} from date {start_date}")
+        return None
+    data.index = data.index.date
+    return data

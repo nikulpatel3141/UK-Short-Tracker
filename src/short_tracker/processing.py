@@ -4,7 +4,19 @@ from typing import Union
 
 import pandas as pd
 
-from short_tracker.data import DATE_COL, FUND_COL, ISIN_COL, SHARE_ISSUER_COL
+from short_tracker.data import (
+    DATE_COL,
+    FUND_COL,
+    ISIN_COL,
+    SHARE_ISSUER_COL,
+    SHORT_POS_COL,
+    CLOSE_COL,
+    ADJ_CLOSE_COL,
+    VOLUME_COL,
+    TICKER_COL,
+)
+
+MKT_DATA_COLS = [CLOSE_COL, ADJ_CLOSE_COL, VOLUME_COL]
 
 logger = logging.getLogger(__name__)
 
@@ -114,3 +126,57 @@ def calc_fund_short_flow_bounds(
     )
     threshold_cross_bound = threshold_discl - discl_threshold
     return discl_diff.fillna(threshold_cross_bound).fillna(0)
+
+
+def extract_sec_tickers(sec_metadata: dict) -> dict:
+    """Take a response from querying OpenFIGI as returned by `query_sec_metadata`
+    and extract a map from queried identifier to ticker. Will pick the first returned ticker
+    in the list if multiple are returned.
+
+    #FIXME: suboptimal way to deal with ambiguous tickers,
+    # should return for further processing.
+    """
+    id_ticker_map = {}
+
+    for id_, id_data in sec_metadata.items():
+        tickers = list({x["ticker"] for x in id_data})
+        if len(tickers) > 1:
+            logger.warning(
+                f"Ambiguous tickers for id {id_}: {tickers}. Picking the first one..."
+            )
+        ticker = tickers[0]
+        id_ticker_map[id_] = ticker
+    return id_ticker_map
+
+
+def process_mkt_data(mkt_data: dict) -> pd.DataFrame:
+    """Take a dict of market data returned by `query_mkt_data` keyed on
+    tickers and concatenate to a single dataframe with the ticker as an
+    additional column.
+    """
+    mkt_data_df_list = []
+
+    for ticker, ticker_data in mkt_data.items():
+        if ticker_data is None:
+            continue
+
+        ticker_data_ = ticker_data[MKT_DATA_COLS].assign(**{TICKER_COL: ticker})
+        mkt_data_df_list.append(ticker_data_)
+    return pd.concat(mkt_data_df_list)
+
+
+def subset_top_shorts(cur_discl: pd.DataFrame, top_n: int):
+    """Subset a dataframe of current disclosures on the top_n overall shorted
+    names, and the top_n individual shorts.
+    """
+    top_sec_shorts = (
+        cur_discl.groupby([SHARE_ISSUER_COL, ISIN_COL])[SHORT_POS_COL]
+        .sum()
+        .sort_values(ascending=False)
+        .head(top_n)
+        .reset_index()
+    )
+    top_fund_shorts = cur_discl.sort_values(by=SHORT_POS_COL, ascending=False).head(
+        top_n
+    )
+    return top_sec_shorts, top_fund_shorts
