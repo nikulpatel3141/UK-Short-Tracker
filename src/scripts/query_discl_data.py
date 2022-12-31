@@ -30,6 +30,7 @@ from short_tracker.config import (
 )
 from short_tracker.utils import setup_logging, n_bdays_ago
 from short_tracker.data import (
+    FUND_COL,
     ITEM_COL,
     TICKER_COL,
     VALUE_COL,
@@ -124,6 +125,22 @@ def query_mkt_data_(tickers) -> pd.DataFrame:
     return pd.concat([mkt_data_, sh_out_])
 
 
+def concat_old_new_data(
+    new_data: pd.DataFrame,
+    old_data: pd.DataFrame,
+    start_date,
+    index_cols: list,
+    date_col=DATE_COL,
+) -> pd.DataFrame:
+    """Convenience function to concatenate old and new data and overwriting
+    the old data with the new data where the index_cols overlap. Also truncate
+    the data to have dates >= the start date
+    """
+    new_data_ = pd.concat([new_data, old_data])
+    new_data_ = new_data_.drop_duplicates(subset=index_cols, keep="first")
+    return new_data_[upl_discl_data[date_col] >= start_date]
+
+
 def update_db(
     discl_data: pd.DataFrame,
     mkt_data: pd.DataFrame,
@@ -139,19 +156,40 @@ def update_db(
     """
     engine = create_engine(CONN_STR)
 
+    start_date = n_bdays_ago(MAX_DATA_AGE, report_date)
     isin_ticker_map_df = (
         pd.Series(isin_ticker_map, name=TICKER_COL).rename_axis(ISIN_COL).reset_index()
     )
 
-    existing_shout = pd.read_sql_query(
-        f"select * from {MKT_DATA_TABLE} where item = '{SH_OUT_COL}'"
+    # FIXME: repetition
+    existing_shout_query = f"""
+    select * from {MKT_DATA_TABLE}
+    where item = '{SH_OUT_COL}' and
+    {DATE_COL} >= '{start_date}'
+    """
+
+    existing_discl_query = f"""
+    select * from {SHORT_DISCL_TABLE}
+    where {DATE_COL} >= '{start_date}'
+    """
+
+    existing_shout = pd.read_sql_query(existing_shout_query, con=engine)
+    existing_discl = pd.read_sql_query(existing_discl_query, con=engine)
+
+    upl_mkt_data = concat_old_new_data(
+        mkt_data, existing_shout, start_date, [DATE_COL, ITEM_COL, TICKER_COL]
     )
-    existing_discl = pd.read_sql_query(f"select * from {SHORT_DISCL_TABLE}")
+    upl_discl_data = concat_old_new_data(
+        discl_data,
+        existing_discl,
+        start_date,
+        [DATE_COL, FUND_COL, ISIN_COL, TICKER_COL],
+    )
 
-    discl_up
-
-    con = engine.begin()
-    isin_ticker_map_df.to_sql(name=SEC_METADATA_TABLE, if_exists="replace", con=con)
+    with engine.begin() as con:
+        isin_ticker_map_df.to_sql(name=SEC_METADATA_TABLE, if_exists="replace", con=con)
+        upl_mkt_data.to_sql(name=MKT_DATA_TABLE, if_exists="replace", con=con)
+        upl_discl_data.to_sql(name=SHORT_DISCL_TABLE, if_exists="replace", con=con)
 
 
 def main():
