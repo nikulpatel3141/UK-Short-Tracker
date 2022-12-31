@@ -17,11 +17,22 @@ from datetime import datetime, timedelta
 import logging
 
 import pandas as pd
+from sqlalchemy import create_engine
 
-
-from short_tracker.config import DB_FILE, MAX_DATA_AGE, TOP_N_SHORTS, UK_MKT_TICKER
-from short_tracker.utils import setup_logging
+from short_tracker.config import (
+    CONN_STR,
+    MAX_DATA_AGE,
+    SEC_METADATA_TABLE,
+    MKT_DATA_TABLE,
+    SHORT_DISCL_TABLE,
+    TOP_N_SHORTS,
+    UK_MKT_TICKER,
+)
+from short_tracker.utils import setup_logging, n_bdays_ago
 from short_tracker.data import (
+    ITEM_COL,
+    TICKER_COL,
+    VALUE_COL,
     query_uk_si_disclosures,
     query_all_sec_metadata,
     query_mkt_data,
@@ -30,10 +41,13 @@ from short_tracker.data import (
     FCA_DATE_COL,
     DATE_COL,
     ISIN_COL,
-    ITEM_COL,
-    VALUE_COL,
+    SH_OUT_COL,
 )
-from short_tracker.processing import subset_top_shorts, extract_sec_tickers
+from short_tracker.processing import (
+    subset_top_shorts,
+    extract_sec_tickers,
+    process_mkt_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +86,7 @@ def query_ticker_map(isins):
     return isin_ticker_map
 
 
-def query_mkt_data_(tickers):
+def query_mkt_data_(tickers) -> pd.DataFrame:
     """Query shares outstanding + price data from Yahoo Finance.
 
     Also process the data:
@@ -88,19 +102,56 @@ def query_mkt_data_(tickers):
     query_tickers = [k.rstrip("/") + ".L" for k in tickers]
     ticker_map = dict(zip(tickers, query_tickers))
 
-    date_now = datetime.today().date()
-    query_start = date_now - timedelta(days=MAX_DATA_AGE + _QUERY_DAYS_BUFFER)
-
+    query_start = n_bdays_ago(MAX_DATA_AGE + _QUERY_DAYS_BUFFER)
     mkt_data = {
         tkr: query_mkt_data(qry_tkr, query_start) for tkr, qry_tkr in ticker_map.items()
     }
     quotes = {tkr: query_quotes(qry_tkr) for tkr, qry_tkr in ticker_map.items()}
 
+    mkt_data_ = process_mkt_data(mkt_data)
+
+    quotes_df = pd.DataFrame(quotes)
+    sh_out = quotes_df.loc[SH_OUT_COL]
+    missing_sh_out = list(sh_out[sh_out.isna()].index)
+
+    if missing_sh_out:
+        logger.warning(f"No share outstanding data for tickers: {missing_sh_out}")
+
+    sh_out_ = sh_out.rename_axis(TICKER_COL).rename(VALUE_COL).to_frame().reset_index()
+    sh_out_.loc[:, DATE_COL] = pd.to_datetime(n_bdays_ago(1))
+    sh_out_.loc[:, ITEM_COL] = SH_OUT_COL
+
+    return pd.concat([mkt_data_, sh_out_])
+
 
 def update_db(
     discl_data: pd.DataFrame,
+    mkt_data: pd.DataFrame,
+    isin_ticker_map: dict,
+    report_date: datetime.date,
 ):
-    pass
+    """Update the database specified by CONN_STR to:
+    1 - delete data beyond the allowed data age (specified by MAX_DATA_AGE)
+    2 - upload new SI disclosure + market data + security metadata
+
+    Notes:
+    - We replace all price + volume data + security metadata for convenience
+    """
+    engine = create_engine(CONN_STR)
+
+    isin_ticker_map_df = (
+        pd.Series(isin_ticker_map, name=TICKER_COL).rename_axis(ISIN_COL).reset_index()
+    )
+
+    existing_shout = pd.read_sql_query(
+        f"select * from {MKT_DATA_TABLE} where item = '{SH_OUT_COL}'"
+    )
+    existing_discl = pd.read_sql_query(f"select * from {SHORT_DISCL_TABLE}")
+
+    discl_up
+
+    con = engine.begin()
+    isin_ticker_map_df.to_sql(name=SEC_METADATA_TABLE, if_exists="replace", con=con)
 
 
 def main():
@@ -110,6 +161,17 @@ def main():
     isins = pd.concat([k[ISIN_COL] for k in top_shorts]).unique()
 
     logger.info(f"Found {len(isins)} isins to query data for")
+
+    logger.info(f"Querying for tickers from OpenFIGI")
+    isin_ticker_map = query_ticker_map(isins)
+    tickers = [UK_MKT_TICKER, *isin_ticker_map.values()]
+
+    logger.info(f"Querying for market data from Yahoo Finance")
+    mkt_data = query_mkt_data_(tickers)
+
+    logger.info(f"Attempting to update database")
+
+    logger.info("Finished!")
 
 
 if __name__ == "__main__":

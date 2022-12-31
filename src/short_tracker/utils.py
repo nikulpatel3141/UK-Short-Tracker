@@ -1,4 +1,5 @@
 import logging, sys
+from datetime import datetime, timedelta
 
 LOG_FMT = r"%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -15,3 +16,12 @@ def setup_logging(logger: logging.Logger):
 
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+
+
+def n_bdays_ago(n: int, start_date=None) -> datetime.date:
+    """Returns a date object for n business days ago relative to the
+    given date. If not given, then default to today.
+    """
+    if start_date is None:
+        start_date = datetime.today().date()
+    return start_date - timedelta(days=n)

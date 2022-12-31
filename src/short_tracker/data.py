@@ -31,6 +31,7 @@ TICKER_COL = "Ticker"
 CLOSE_COL = "Close"
 ADJ_CLOSE_COL = "Adj Close"
 VOLUME_COL = "Volume"
+SH_OUT_COL = "sharesOutstanding"
 
 # for storing market data #FIXME: should go in a schema file
 DATE_COL = "date"

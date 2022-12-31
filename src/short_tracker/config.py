@@ -3,6 +3,7 @@ from pathlib import Path
 _CONFIG_PATH = Path(__file__)
 
 DB_FILE = _CONFIG_PATH.parents[2].joinpath("data/data.sqlite")
+CONN_STR = f"sqlite:///{DB_FILE}"
 
 # table names
 SHORT_DISCL_TABLE = "uk_short_discl"

@@ -155,8 +155,6 @@ def process_mkt_data(mkt_data: dict) -> pd.DataFrame:
     """Take a dict of market data returned by `query_mkt_data` keyed on
     tickers and concatenate to a single long dataframe with columns date, ticker,
     item (close, volume, ...), value.
-
-    Also process the item names to remove spaces and
     """
     mkt_data_df_list = []
 
