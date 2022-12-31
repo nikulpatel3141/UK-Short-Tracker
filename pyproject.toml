@@ -15,6 +15,7 @@ dependencies = [
     "requests",
     "tenacity",
     "pandas",
+    "fastparquet",
     "pandas_datareader",
     "yfinance",
 ]

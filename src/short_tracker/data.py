@@ -10,9 +10,7 @@ from tenacity import retry, retry_if_exception_type, wait_fixed
 import yfinance as yf
 import pandas as pd
 
-SHORT_URL_UK = (
-    "https://www.fca.org.uk/publication/data/short-positions-daily-update.xlsx"
-)
+SHORT_URL_UK = "https://www.fca.org.uk/publication/data/short-positions-daily-update.xlsx"  # FIXME: this should be somewhere else...
 ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
 
 # earliest time UK equity markets will close, short disclosures to be filed after this
@@ -22,11 +20,11 @@ UK_DISCL_THRESHOLD = 0.5
 # Columns from UK's FCA short disclosures
 FUND_COL = "Position Holder"
 ISIN_COL = "ISIN"
-DATE_COL = "Position Date"
+FCA_DATE_COL = "Position Date"
 SHORT_POS_COL = "Net Short Position (%)"
 SHARE_ISSUER_COL = "Name of Share Issuer"
 
-EXP_DISCL_COLS = [FUND_COL, ISIN_COL, SHARE_ISSUER_COL, DATE_COL, SHORT_POS_COL]
+EXP_DISCL_COLS = [FUND_COL, ISIN_COL, SHARE_ISSUER_COL, FCA_DATE_COL, SHORT_POS_COL]
 
 # Columns from Yahoo Finance
 TICKER_COL = "Ticker"
@@ -34,6 +32,10 @@ CLOSE_COL = "Close"
 ADJ_CLOSE_COL = "Adj Close"
 VOLUME_COL = "Volume"
 
+# for storing market data #FIXME: should go in a schema file
+DATE_COL = "date"
+ITEM_COL = "item"
+VALUE_COL = "value"
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
 OPENFIGI_HEADERS = {"Content-Type": "application/json"}

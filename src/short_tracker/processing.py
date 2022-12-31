@@ -8,10 +8,12 @@ from short_tracker.data import (
     DATE_COL,
     FUND_COL,
     ISIN_COL,
+    ITEM_COL,
     SHARE_ISSUER_COL,
     SHORT_POS_COL,
     CLOSE_COL,
     ADJ_CLOSE_COL,
+    VALUE_COL,
     VOLUME_COL,
     TICKER_COL,
 )
@@ -151,8 +153,10 @@ def extract_sec_tickers(sec_metadata: dict) -> dict:
 
 def process_mkt_data(mkt_data: dict) -> pd.DataFrame:
     """Take a dict of market data returned by `query_mkt_data` keyed on
-    tickers and concatenate to a single dataframe with the ticker as an
-    additional column.
+    tickers and concatenate to a single long dataframe with columns date, ticker,
+    item (close, volume, ...), value.
+
+    Also process the item names to remove spaces and
     """
     mkt_data_df_list = []
 
@@ -162,7 +166,15 @@ def process_mkt_data(mkt_data: dict) -> pd.DataFrame:
 
         ticker_data_ = ticker_data[MKT_DATA_COLS].assign(**{TICKER_COL: ticker})
         mkt_data_df_list.append(ticker_data_)
-    return pd.concat(mkt_data_df_list)
+    mkt_data_df = pd.concat(mkt_data_df_list)
+
+    mkt_data_df_stacked = (
+        mkt_data_df.rename_axis(index=DATE_COL, columns=ITEM_COL)
+        .set_index(TICKER_COL, append=True)
+        .stack()
+        .rename(VALUE_COL)
+        .reset_index()
+    )
 
 
 def subset_top_shorts(cur_discl: pd.DataFrame, top_n: int):
