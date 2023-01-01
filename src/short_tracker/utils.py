@@ -1,6 +1,6 @@
 import logging, sys
-from datetime import datetime, timedelta
-
+from datetime import datetime
+from pandas.tseries.offsets import BusinessDay
 
 LOG_FMT = r"%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -25,4 +25,4 @@ def n_bdays_ago(n: int, start_date=None) -> datetime.date:
     """
     if start_date is None:
         start_date = datetime.today().date()
-    return start_date - timedelta(days=n)
+    return start_date - BusinessDay(n)
