@@ -22,11 +22,13 @@ from sqlalchemy import create_engine
 from short_tracker.config import (
     CONN_STR,
     MAX_DATA_AGE,
+    TOP_N_SHORTS,
+    UK_MKT_TICKER,
+)
+from short_tracker.schemas import (
     SEC_METADATA_TABLE,
     MKT_DATA_TABLE,
     SHORT_DISCL_TABLE,
-    TOP_N_SHORTS,
-    UK_MKT_TICKER,
 )
 from short_tracker.utils import setup_logging, n_bdays_ago
 from short_tracker.data import (
@@ -56,7 +58,7 @@ OPENFIGI_PARAMS = {"idType": "ID_ISIN", "exchCode": "LN"}
 _QUERY_DAYS_BUFFER = 10  # add to # of days to query beyond MAX_DATA_AGE
 
 
-def query_uk_si_disclosures_() -> pd.DataFrame:
+def query_uk_si_disclosures_():
     """Fetch the UK SI disclosures from FCA and return the current disclosures
     labelled with today's date.
     """
@@ -68,7 +70,7 @@ def query_uk_si_disclosures_() -> pd.DataFrame:
     # track as of date instead of date filed
     cur_discl = discl_data["current"].drop(columns=[FCA_DATE_COL])
     cur_discl.loc[:, DATE_COL] = pd.to_datetime(report_date)
-    return cur_discl
+    return cur_discl, report_date
 
 
 def query_ticker_map(isins):
@@ -87,7 +89,7 @@ def query_ticker_map(isins):
     return isin_ticker_map
 
 
-def query_mkt_data_(tickers) -> pd.DataFrame:
+def query_mkt_data_(tickers, report_date) -> pd.DataFrame:
     """Query shares outstanding + price data from Yahoo Finance.
 
     Also process the data:
@@ -119,10 +121,13 @@ def query_mkt_data_(tickers) -> pd.DataFrame:
         logger.warning(f"No share outstanding data for tickers: {missing_sh_out}")
 
     sh_out_ = sh_out.rename_axis(TICKER_COL).rename(VALUE_COL).to_frame().reset_index()
-    sh_out_.loc[:, DATE_COL] = pd.to_datetime(n_bdays_ago(1))
+    sh_out_.loc[:, DATE_COL] = pd.to_datetime(report_date)
     sh_out_.loc[:, ITEM_COL] = SH_OUT_COL
 
-    return pd.concat([mkt_data_, sh_out_])
+    mkt_data = pd.concat([mkt_data_, sh_out_])
+    mkt_data.loc[:, DATE_COL] = pd.to_datetime(mkt_data[DATE_COL])
+    mkt_data.loc[:, VALUE_COL] = pd.to_numeric(mkt_data[VALUE_COL])
+    return mkt_data
 
 
 def concat_old_new_data(
@@ -138,7 +143,7 @@ def concat_old_new_data(
     """
     new_data_ = pd.concat([new_data, old_data])
     new_data_ = new_data_.drop_duplicates(subset=index_cols, keep="first")
-    return new_data_[upl_discl_data[date_col] >= start_date]
+    return new_data_[new_data_[date_col] >= pd.to_datetime(start_date)]
 
 
 def update_db(
@@ -157,11 +162,12 @@ def update_db(
     engine = create_engine(CONN_STR)
 
     start_date = n_bdays_ago(MAX_DATA_AGE, report_date)
+    logger.info(f"Will delete data in db older than {start_date}")
+
     isin_ticker_map_df = (
         pd.Series(isin_ticker_map, name=TICKER_COL).rename_axis(ISIN_COL).reset_index()
     )
 
-    # FIXME: repetition
     existing_shout_query = f"""
     select * from {MKT_DATA_TABLE}
     where item = '{SH_OUT_COL}' and
@@ -173,8 +179,12 @@ def update_db(
     where {DATE_COL} >= '{start_date}'
     """
 
-    existing_shout = pd.read_sql_query(existing_shout_query, con=engine)
-    existing_discl = pd.read_sql_query(existing_discl_query, con=engine)
+    existing_shout = pd.read_sql_query(
+        existing_shout_query, con=engine, parse_dates=[DATE_COL]
+    )
+    existing_discl = pd.read_sql_query(
+        existing_discl_query, con=engine, parse_dates=[DATE_COL]
+    )
 
     upl_mkt_data = concat_old_new_data(
         mkt_data, existing_shout, start_date, [DATE_COL, ITEM_COL, TICKER_COL]
@@ -183,17 +193,27 @@ def update_db(
         discl_data,
         existing_discl,
         start_date,
-        [DATE_COL, FUND_COL, ISIN_COL, TICKER_COL],
+        [DATE_COL, FUND_COL, ISIN_COL],
     )
 
+    def upload_data(df, table, con):
+        delete_stmt = f"DELETE FROM {table}"
+        con.execute(delete_stmt)
+        df.to_sql(name=table, index=False, if_exists="append", con=con)
+
+    to_upload = [
+        [SEC_METADATA_TABLE, isin_ticker_map_df],
+        [MKT_DATA_TABLE, upl_mkt_data],
+        [SHORT_DISCL_TABLE, upl_discl_data],
+    ]
+
     with engine.begin() as con:
-        isin_ticker_map_df.to_sql(name=SEC_METADATA_TABLE, if_exists="replace", con=con)
-        upl_mkt_data.to_sql(name=MKT_DATA_TABLE, if_exists="replace", con=con)
-        upl_discl_data.to_sql(name=SHORT_DISCL_TABLE, if_exists="replace", con=con)
+        for (tbl, df) in to_upload:
+            upload_data(df, tbl, con)
 
 
 def main():
-    cur_discl = query_uk_si_disclosures_()
+    cur_discl, report_date = query_uk_si_disclosures_()
 
     top_shorts = subset_top_shorts(cur_discl, TOP_N_SHORTS)
     isins = pd.concat([k[ISIN_COL] for k in top_shorts]).unique()
@@ -205,9 +225,15 @@ def main():
     tickers = [UK_MKT_TICKER, *isin_ticker_map.values()]
 
     logger.info(f"Querying for market data from Yahoo Finance")
-    mkt_data = query_mkt_data_(tickers)
+    mkt_data = query_mkt_data_(tickers, report_date)
 
     logger.info(f"Attempting to update database")
+    update_db(
+        cur_discl,
+        mkt_data,
+        isin_ticker_map,
+        report_date,
+    )
 
     logger.info("Finished!")
 

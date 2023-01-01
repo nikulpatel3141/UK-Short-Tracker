@@ -173,6 +173,7 @@ def process_mkt_data(mkt_data: dict) -> pd.DataFrame:
         .rename(VALUE_COL)
         .reset_index()
     )
+    return mkt_data_df_stacked
 
 
 def subset_top_shorts(cur_discl: pd.DataFrame, top_n: int):
