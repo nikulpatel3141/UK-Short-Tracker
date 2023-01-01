@@ -17,6 +17,7 @@ ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
 UK_MKT_EARLY_CLOSE = time(hour=12, minute=30)
 UK_DISCL_THRESHOLD = 0.5
 
+# FIXME: most of these should go in the schema module
 # Columns from UK's FCA short disclosures
 FUND_COL = "Position Holder"
 ISIN_COL = "ISIN"
@@ -31,12 +32,23 @@ TICKER_COL = "Ticker"
 CLOSE_COL = "Close"
 ADJ_CLOSE_COL = "Adj Close"
 VOLUME_COL = "Volume"
+MKT_CAP_COL = "marketCap"
 SH_OUT_COL = "sharesOutstanding"
 
-# for storing market data #FIXME: should go in a schema file
+# for storing market data
 DATE_COL = "date"
 ITEM_COL = "item"
 VALUE_COL = "value"
+
+# calculated columns
+RET_COL = "Return"
+AMOUNT_COL = "Amount"
+BM_RET_COL = "Benchmark Return"
+REL_RET_COL = "Relative Return"
+EXPO_COL = "Exposure"
+PNL_COL = "PnL"
+REL_PNL_COL = "Rel PnL"
+DTC_COL = "Days to Cover"
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
 OPENFIGI_HEADERS = {"Content-Type": "application/json"}

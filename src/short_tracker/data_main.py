@@ -29,6 +29,7 @@ from short_tracker.schemas import (
     SEC_METADATA_TABLE,
     MKT_DATA_TABLE,
     SHORT_DISCL_TABLE,
+    seed_db,
 )
 from short_tracker.utils import setup_logging, n_bdays_ago
 from short_tracker.data import (
@@ -36,15 +37,16 @@ from short_tracker.data import (
     ITEM_COL,
     TICKER_COL,
     VALUE_COL,
+    FCA_DATE_COL,
+    DATE_COL,
+    ISIN_COL,
+    SH_OUT_COL,
+    MKT_CAP_COL,
     query_uk_si_disclosures,
     query_all_sec_metadata,
     query_mkt_data,
     query_quotes,
     SHORT_URL_UK,
-    FCA_DATE_COL,
-    DATE_COL,
-    ISIN_COL,
-    SH_OUT_COL,
 )
 from short_tracker.processing import (
     subset_top_shorts,
@@ -213,6 +215,7 @@ def update_db(
 
 
 def main():
+    seed_db()  # if db tables aren't already created
     cur_discl, report_date = query_uk_si_disclosures_()
 
     top_shorts = subset_top_shorts(cur_discl, TOP_N_SHORTS)

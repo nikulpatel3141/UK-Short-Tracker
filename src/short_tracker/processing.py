@@ -1,9 +1,12 @@
 import logging
 from datetime import date
 from typing import Union
+from functools import reduce
 
 import pandas as pd
 
+from short_tracker.config import METRICS_LOOKBACK, ADV_CALC_LOOKBACK
+from short_tracker.utils import n_bdays_ago
 from short_tracker.data import (
     DATE_COL,
     FUND_COL,
@@ -15,10 +18,15 @@ from short_tracker.data import (
     ADJ_CLOSE_COL,
     VALUE_COL,
     VOLUME_COL,
+    BM_RET_COL,
+    SH_OUT_COL,
     TICKER_COL,
+    RET_COL,
 )
 
 MKT_DATA_COLS = [CLOSE_COL, ADJ_CLOSE_COL, VOLUME_COL]
+
+_REINDEX_BUFFER = 10
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +189,7 @@ def subset_top_shorts(cur_discl: pd.DataFrame, top_n: int):
     names, and the top_n individual shorts.
     """
     top_sec_shorts = (
-        cur_discl.groupby([SHARE_ISSUER_COL, ISIN_COL])[SHORT_POS_COL]
+        cur_discl.groupby([DATE_COL, SHARE_ISSUER_COL, ISIN_COL])[SHORT_POS_COL]
         .sum()
         .sort_values(ascending=False)
         .head(top_n)
@@ -191,3 +199,119 @@ def subset_top_shorts(cur_discl: pd.DataFrame, top_n: int):
         top_n
     )
     return top_sec_shorts, top_fund_shorts
+
+
+def reindex_mkt_data(mkt_data, reindex_dates, ffill=True, bfill=False):
+    """Reindex market data on the given dates with optional forward and backwards filling.
+
+    Returns: a df of market data reindexed as above with the same columns as the input
+    data (ticker, date, item, value).
+    """
+    mkt_data_ = mkt_data.pivot(
+        index=DATE_COL, columns=TICKER_COL, values=[VALUE_COL]
+    ).reindex(reindex_dates)
+
+    if ffill:
+        mkt_data_ = mkt_data_.ffill()
+    if bfill:
+        mkt_data_ = mkt_data_.bfill()
+    return mkt_data_.stack().reset_index()
+
+
+def reindex_rename_mkt_data(
+    mkt_data, reindex_dates, item, val_name, bfill=False, ffill=True
+):
+    """Call reindex_mkt_data on the subset where ITEM_COL=item and rename the
+    value column to the given name.
+    """
+    df = reindex_mkt_data(
+        mkt_data[mkt_data[ITEM_COL] == item],
+        reindex_dates,
+        bfill=bfill,
+        ffill=ffill,
+    )
+    return df.rename(columns={VALUE_COL: val_name})
+
+
+def calc_reindex_dates(latest_rpt_date):
+    """Calculate a sequence of business dates to reindex over before
+    joining data.
+    """
+    lookback_days = METRICS_LOOKBACK + _REINDEX_BUFFER
+    lookback_date = n_bdays_ago(lookback_days, latest_rpt_date)
+    reindex_dates = pd.bdate_range(lookback_date, latest_rpt_date, name=DATE_COL)
+    return reindex_dates
+
+
+def calc_returns(close_prices_df, reindex_dates):
+    """Calculate returns using the given market data for (adjusted) close prices
+    FIXME: messy
+    """
+    adj_close = reindex_rename_mkt_data(
+        close_prices_df, reindex_dates, ADJ_CLOSE_COL, ADJ_CLOSE_COL, bfill=True
+    )
+    adj_close.loc[:, ADJ_CLOSE_COL] = adj_close[ADJ_CLOSE_COL] / 100  # GBX to GBP
+    adj_close = adj_close.sort_values(by=[TICKER_COL, DATE_COL])
+
+    calc_ret = lambda df: df.set_index(DATE_COL)[[ADJ_CLOSE_COL]].pct_change()
+    returns = (
+        adj_close.groupby(TICKER_COL)
+        .apply(calc_ret)
+        .rename(columns={ADJ_CLOSE_COL: RET_COL})
+        .reset_index()
+    )
+    return adj_close, returns
+
+
+def calc_adv(volume_data, lookback) -> pd.DataFrame:
+    """Calculate a (flat) estimate of average daily trading volume"""
+    vol = volume_data.sort_values(by=[TICKER_COL, DATE_COL]).drop(columns=[ITEM_COL])
+    adv = (
+        vol.set_index(DATE_COL)
+        .groupby(TICKER_COL)[VALUE_COL]
+        .rolling(lookback, min_periods=1)
+        .mean()
+        .rename(VOLUME_COL)
+        .reset_index()
+    )
+    return adv
+
+
+def prepare_discl_data(discl_data, isin_ticker_map):
+    """Join on a ticker -> isin mapping and normalise the short position column
+    for the given disclosures df.
+    """
+    discl_data.loc[:, SHORT_POS_COL] = discl_data.loc[:, SHORT_POS_COL] / 100
+
+    discl_data_ = discl_data.merge(isin_ticker_map, on=[ISIN_COL], how="left")
+    return discl_data_
+
+
+def prepare_mkt_data(mkt_data, reindex_dates, bm_ticker):
+    """Prepare market data for joining with short disclosures data
+    - reindex all data to
+    - calculate returns + benchmark returns
+    """
+    adj_close, returns = calc_returns(mkt_data, reindex_dates)
+
+    bm_returns = (
+        returns[returns[TICKER_COL] == bm_ticker]
+        .rename(columns={RET_COL: BM_RET_COL})
+        .drop(columns=[TICKER_COL])
+    )
+
+    sh_out = reindex_rename_mkt_data(
+        mkt_data, reindex_dates, SH_OUT_COL, SH_OUT_COL, bfill=True
+    )
+
+    _grp_shift = lambda df: df.set_index(DATE_COL)[[ADJ_CLOSE_COL]].shift()
+    adj_close_shifted = adj_close.groupby(TICKER_COL).apply(_grp_shift).reset_index()
+
+    adv = calc_adv(mkt_data[mkt_data[ITEM_COL] == VOLUME_COL], ADV_CALC_LOOKBACK)
+
+    to_merge = [sh_out, adj_close_shifted, returns, adv]
+
+    merge_df_fn = lambda x, y: x.merge(y, on=[DATE_COL, TICKER_COL], how="outer")
+    mkt_data_concat = reduce(merge_df_fn, to_merge)
+    mkt_data_concat = mkt_data_concat.merge(bm_returns, on=[DATE_COL], how="outer")
+    return mkt_data_concat

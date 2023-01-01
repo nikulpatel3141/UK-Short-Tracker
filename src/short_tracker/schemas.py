@@ -17,7 +17,6 @@ SHORT_DISCL_TABLE = "uk_short_discl"
 MKT_DATA_TABLE = "market_data"  # OHLC, shares outstanding
 SEC_METADATA_TABLE = "sec_metadata"  # ticker, isin
 
-engine = create_engine(CONN_STR)
 md = MetaData()
 
 mkt_data_tbl = Table(
@@ -46,4 +45,8 @@ discl_data_tbl = Table(
     Column(SHORT_POS_COL, Float()),
 )
 
-md.create_all(engine)
+
+def seed_db():
+    """Create the database tables specified above"""
+    engine = create_engine(CONN_STR)
+    md.create_all(engine)
