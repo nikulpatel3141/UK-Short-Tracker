@@ -20,5 +20,6 @@ dependencies = [
     "pandas_datareader",
     "yfinance",
     "sqlalchemy==1.4.45",
+    "openpyxl",
 ]
 
