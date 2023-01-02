@@ -242,5 +242,5 @@ def main():
 
 
 if __name__ == "__main__":
-    setup_logging(logger)
+    setup_logging(logging.getLogger())
     main()
