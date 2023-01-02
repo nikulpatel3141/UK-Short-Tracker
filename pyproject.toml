@@ -14,9 +14,11 @@ classifiers = [
 dependencies = [
     "requests",
     "tenacity",
+    "numpy",
     "pandas",
     "fastparquet",
     "pandas_datareader",
     "yfinance",
+    "sqlalchemy",
 ]
 
