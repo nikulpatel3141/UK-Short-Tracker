@@ -234,7 +234,7 @@ def style_metrics_df(metrics_df, report_date):
         metrics_df.style.format(formatter=FORMAT_DICT)
         # .bar(subset=[PNL_COL], color="#d65f5f")
         .set_table_styles(TBL_STYLES)
-        .background_gradient(subset=SHORT_POS_COL)
+        .background_gradient(subset=PNL_COL)
         .set_caption(caption)
     )
 
