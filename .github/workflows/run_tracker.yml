@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Build
-        run: python3 -m pip install .
+        run: python3 -m pip install --user .
       - name: Collect Data
         run: python3 src/short_tracker/data_main.py
       - name: Calculate and Format Results
