@@ -15,10 +15,10 @@ dependencies = [
     "requests",
     "tenacity",
     "numpy",
-    "pandas",
+    "pandas>=1.5",
     "fastparquet",
     "pandas_datareader",
     "yfinance",
-    "sqlalchemy",
+    "sqlalchemy==1.4.45",
 ]
 
