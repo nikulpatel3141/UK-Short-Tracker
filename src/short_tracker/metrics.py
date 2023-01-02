@@ -64,24 +64,23 @@ GBP_COLS = [PNL_COL, REL_PNL_COL, EXPO_COL, EXPO_DIFF_COL]
 PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL]
 FLOAT_COLS = [DTC_COL]
 
-
 CURR_FMT = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
-
+DATE_FMT = lambda x: x.strftime("%Y-%m-%d")
 FORMAT_DICT = {
     **{k: CURR_FMT for k in GBP_COLS},
     **{k: "{:.1f}" for k in FLOAT_COLS},
     **{k: lambda x: f"{100*x:.2f}%" for k in PCT_COLS},
-    LOOKBACK_DATE_COL: lambda x: x.strftime("%Y-%m-%d"),
+    LOOKBACK_DATE_COL: DATE_FMT,
 }
-
-TBL_STYLES = [
-    {"selector": "tr:hover", "props": "background-color: yellow"},
-    {"selector": "th", "props": "background-color: #346eeb"},
-]
-
 ODD_ROW_COL = "#d4d4d4"
 EVEN_ROW_COL = "#8c8c8c"
 TBL_BORDER = "1px"
+TBL_STYLES = [
+    {"selector": "tr:nth-child(odd)", "props": f"background-color: {ODD_ROW_COL}"},
+    {"selector": "tr:nth-child(even)", "props": f"background-color: {EVEN_ROW_COL}"},
+    {"selector": "tr:hover", "props": "background-color: yellow"},
+    {"selector": "th", "props": "background-color: #346eeb"},
+]
 
 
 logger = logging.getLogger(__name__)
@@ -215,21 +214,28 @@ def summarise_short_discl(discl_data, mkt_data, isin_ticker_map):
     return sec_short_metrics, fund_short_metrics
 
 
-def style_metrics_df(metrics_df):
+def style_metrics_df(metrics_df, report_date):
     """Style the output metrics df:
     - format the values according to FORMAT_DICT (currency, percent, floats, dates)
     - color the headers in blue and rows in alternating colors
     - add a background gradient for the short position
     - add bars for the pnl column
     """
-    even_rows = pd.IndexSlice[::2]
+    if FUND_COL not in metrics_df.index.names:
+        caption_info = "(aggregated over securities)"
+    else:
+        caption_info = "(per fund + security)"
+
+    caption = f"""
+    Top {len(metrics_df)} UK disclosed shorts {caption_info} as of {DATE_FMT(report_date)}
+    """
+
     return (
         metrics_df.style.format(formatter=FORMAT_DICT)
         .bar(subset=[PNL_COL], color="#d65f5f")
-        .set_properties(**{"background-color": ODD_ROW_COL, "border": TBL_BORDER})
-        .set_properties(**{"background-color": EVEN_ROW_COL}, subset=even_rows)
         .set_table_styles(TBL_STYLES)
         .background_gradient(subset=SHORT_POS_COL)
+        .set_caption(caption)
     )
 
 
@@ -240,11 +246,23 @@ def main():
     logger.info("Retrieving existing data")
     discl_data, mkt_data, isin_ticker_map = query_all_db_data()
 
+    report_date = discl_data[DATE_COL].max()
+
     logger.info("Calculating metrics...")
-    top_sec_aug, top_fund_aug = summarise_short_discl(
+    sec_short_metrics, fund_short_metrics = summarise_short_discl(
         discl_data, mkt_data, isin_ticker_map
     )
+
+    sec_short_metrics_styled = style_metrics_df(sec_short_metrics, report_date)
+    fund_short_metrics_styled = style_metrics_df(fund_short_metrics, report_date)
+
     logger.info(f"Saving output as JSON to {OUT_FILE}")
-    output = {"sec": top_sec_aug, "fund": top_fund_aug}
+    output = {
+        "sec": sec_short_metrics_styled.to_html(),
+        "fund": fund_short_metrics_styled.to_html(),
+    }
+
     with open(OUT_FILE, "w") as f:
         json.dump(output, f)
+
+    logger.info("Done!")

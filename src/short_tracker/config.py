@@ -7,7 +7,7 @@ _PROJECT_ROOT = _CONFIG_PATH.parents[2]
 DB_FILE = _PROJECT_ROOT.joinpath("data/data.sqlite")
 CONN_STR = f"sqlite:///{DB_FILE}"
 
-OUT_FILE = _PROJECT_ROOT.joinpath("output.json")
+OUT_FILE = _PROJECT_ROOT.joinpath("output/output.json")
 
 MAX_DATA_AGE = 30  # # of days of data to keep
 TOP_N_SHORTS = 20  # # of top fund/overall shorts to keep
