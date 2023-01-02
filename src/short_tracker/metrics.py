@@ -60,16 +60,20 @@ DISPL_COLS = [
     LOOKBACK_DATE_COL,
 ]
 
-GBP_COLS = [PNL_COL, REL_PNL_COL, EXPO_COL, EXPO_DIFF_COL]
+GBP_K_COLS = [PNL_COL, REL_PNL_COL, EXPO_DIFF_COL]
+GBP_M_COLS = [EXPO_COL]
 PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL]
 FLOAT_COLS = [DTC_COL]
 
-CURR_FMT = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
-DATE_FMT = lambda x: x.strftime("%Y-%m-%d")
+# FIXME: repetition
+CURR_FMT_K = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
+CURR_FMT_M = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-6):,.1f}M"
+DATE_FMT = lambda x: x.strftime("%y-%m-%d")
 FORMAT_DICT = {
-    **{k: CURR_FMT for k in GBP_COLS},
+    **{k: CURR_FMT_K for k in GBP_K_COLS},
+    **{k: CURR_FMT_M for k in GBP_M_COLS},
     **{k: "{:.1f}" for k in FLOAT_COLS},
-    **{k: lambda x: f"{100*x:.2f}%" for k in PCT_COLS},
+    **{k: lambda x: f"{100*x:.1f}%" for k in PCT_COLS},
     LOOKBACK_DATE_COL: DATE_FMT,
 }
 ODD_ROW_COL = "#d4d4d4"
