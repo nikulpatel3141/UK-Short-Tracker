@@ -10,7 +10,7 @@ CONN_STR = f"sqlite:///{DB_FILE}"
 OUT_FILE = _PROJECT_ROOT.joinpath("output/output.json")
 
 MAX_DATA_AGE = 30  # # of days of data to keep
-TOP_N_SHORTS = 20  # # of top fund/overall shorts to keep
+TOP_N_SHORTS = 10  # # of top fund/overall shorts to keep
 METRICS_LOOKBACK = 5  # # of days over which to report metrics (eg 5 ~ weekly)
 ADV_CALC_LOOKBACK = 22  # # of days for the average daily volume calculation
 

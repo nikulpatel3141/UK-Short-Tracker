@@ -171,9 +171,9 @@ def calc_display_metrics(lookback_discl_df):
     aggfuncs = {
         SHORT_POS_COL: pd.NamedAgg(column=SHORT_POS_COL, aggfunc="last"),
         RET_COL: pd.NamedAgg(column=RET_COL, aggfunc=cumulate_ret),
-        REL_RET_COL: pd.NamedAgg(column=REL_RET_COL, aggfunc=cumulate_ret),
+        # REL_RET_COL: pd.NamedAgg(column=REL_RET_COL, aggfunc=cumulate_ret),
         PNL_COL: pd.NamedAgg(column=PNL_COL, aggfunc="sum"),
-        REL_PNL_COL: pd.NamedAgg(column=REL_PNL_COL, aggfunc="sum"),
+        # REL_PNL_COL: pd.NamedAgg(column=REL_PNL_COL, aggfunc="sum"),
         DTC_COL: pd.NamedAgg(column=DTC_COL, aggfunc="last"),
         EXPO_COL: pd.NamedAgg(column=EXPO_COL, aggfunc="last"),
         EXPO_DIFF_COL: pd.NamedAgg(column=EXPO_COL, aggfunc=top_tail_diff),
