@@ -29,6 +29,11 @@ from short_tracker.data import (
     DTC_COL,
     VOLUME_COL,
     TICKER_COL,
+    ISIN_COL,
+    SHARE_ISSUER_COL,
+    FUND_COL,
+    EXPO_DIFF_COL,
+    LOOKBACK_DATE_COL,
 )  # FIXME: too many imports...
 from short_tracker.schemas import (
     SEC_METADATA_TABLE,
@@ -41,6 +46,43 @@ from short_tracker.processing import (
     prepare_mkt_data,
     subset_top_shorts,
 )
+
+
+DISPL_COLS = [
+    SHORT_POS_COL,
+    EXPO_COL,
+    EXPO_DIFF_COL,
+    RET_COL,
+    REL_RET_COL,
+    PNL_COL,
+    REL_PNL_COL,
+    DTC_COL,
+    LOOKBACK_DATE_COL,
+]
+
+GBP_COLS = [PNL_COL, REL_PNL_COL, EXPO_COL, EXPO_DIFF_COL]
+PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL]
+FLOAT_COLS = [DTC_COL]
+
+
+CURR_FMT = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
+
+FORMAT_DICT = {
+    **{k: CURR_FMT for k in GBP_COLS},
+    **{k: "{:.1f}" for k in FLOAT_COLS},
+    **{k: lambda x: f"{100*x:.2f}%" for k in PCT_COLS},
+    LOOKBACK_DATE_COL: lambda x: x.strftime("%Y-%m-%d"),
+}
+
+TBL_STYLES = [
+    {"selector": "tr:hover", "props": "background-color: yellow"},
+    {"selector": "th", "props": "background-color: #346eeb"},
+]
+
+ODD_ROW_COL = "#d4d4d4"
+EVEN_ROW_COL = "#8c8c8c"
+TBL_BORDER = "1px"
+
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +124,66 @@ def augment_discl_metrics(discl_data):
     return discl_data_
 
 
-def summarise_short_discl(discl_data, mkt_data, isin_ticker_map, top_n):
+def _subset_index(df, df_subset, index_cols):
+    """Subsets df on df_susbet where the values in df[index_cols] are
+    in df_subset[index_cols]
+    """
+    idx = df_subset.set_index(index_cols).index
+    subset_ind = df.set_index(index_cols).index.isin(idx)
+    return df.loc[subset_ind]
+
+
+def susbet_hist_disclosures(discl_df, top_n, end_date):
+    """Subset the disclosures on the top_n current disclosures, but use the
+    latest disclosures to subset the previous disclosures too.
+    """
+    cur_discl = discl_df[discl_df[DATE_COL] == end_date]
+    top_sec_shorts, top_fund_shorts = subset_top_shorts(cur_discl, top_n)
+    top_sec_shorts_lookback = _subset_index(discl_df, top_sec_shorts, [ISIN_COL])
+    top_sec_shorts_lookback = (
+        top_sec_shorts_lookback.groupby(
+            [ISIN_COL, TICKER_COL, SHARE_ISSUER_COL, DATE_COL]
+        )[SHORT_POS_COL]
+        .sum()
+        .reset_index()
+    )
+
+    top_fund_shorts_lookback = _subset_index(
+        discl_df, top_fund_shorts, [ISIN_COL, FUND_COL]
+    )
+    return top_sec_shorts_lookback, top_fund_shorts_lookback
+
+
+def calc_display_metrics(lookback_discl_df):
+    """Aggregates returns, pnl and calculates overall change in exposure
+    for the given disclosures, grouped by ticker and also fund if given.
+    """
+    grp_cols = [TICKER_COL, SHARE_ISSUER_COL]
+
+    if FUND_COL in lookback_discl_df:
+        grp_cols = [*grp_cols, FUND_COL]
+
+    lookback_discl_df_ = lookback_discl_df.sort_values(by=[TICKER_COL, DATE_COL])
+    lookback_discl_df_ = augment_discl_metrics(lookback_discl_df_)
+
+    cumulate_ret = lambda x: (1 + x).cumprod() - 1
+    top_tail_diff = lambda x: x.iloc[0] - x.iloc[-1]
+
+    aggfuncs = {
+        SHORT_POS_COL: pd.NamedAgg(column=SHORT_POS_COL, aggfunc="last"),
+        RET_COL: pd.NamedAgg(column=RET_COL, aggfunc=cumulate_ret),
+        REL_RET_COL: pd.NamedAgg(column=REL_RET_COL, aggfunc=cumulate_ret),
+        PNL_COL: pd.NamedAgg(column=PNL_COL, aggfunc="sum"),
+        REL_PNL_COL: pd.NamedAgg(column=REL_PNL_COL, aggfunc="sum"),
+        DTC_COL: pd.NamedAgg(column=DTC_COL, aggfunc="last"),
+        EXPO_COL: pd.NamedAgg(column=EXPO_COL, aggfunc="last"),
+        EXPO_DIFF_COL: pd.NamedAgg(column=EXPO_COL, aggfunc=top_tail_diff),
+        LOOKBACK_DATE_COL: pd.NamedAgg(column=DATE_COL, aggfunc="min"),
+    }
+    return lookback_discl_df_.groupby(grp_cols).agg(**aggfuncs)
+
+
+def summarise_short_discl(discl_data, mkt_data, isin_ticker_map):
     """Process the input data and calculate summary stats for the top_n disclosed shorts
     per fund and top_n overall shorts.
     """
@@ -93,22 +194,43 @@ def summarise_short_discl(discl_data, mkt_data, isin_ticker_map, top_n):
 
     discl_data_ = prepare_discl_data(discl_data, isin_ticker_map)
 
-    def calc_discl_metrics(discl_subset):
-        discl_data_ = prepare_discl_data(discl_subset, isin_ticker_map)
-        discl_data_ = discl_data_.merge(
-            mkt_data_concat, on=[DATE_COL, TICKER_COL], how="left"
-        )
-        return augment_discl_metrics(discl_data_)
+    dt_cond = (discl_data_[DATE_COL] <= latest_rpt_date) & (
+        discl_data_[DATE_COL] >= lookback_date
+    )
+    lookback_discl = discl_data_[dt_cond]
 
-    lookback_discl = discl_data[
-        (discl_data[DATE_COL] <= latest_rpt_date)
-        & (discl_data[DATE_COL] >= lookback_date)
-    ]
-    top_sec_shorts, top_fund_shorts = subset_top_shorts(cur_discl, top_n)
+    top_sec_shorts_lookback, top_fund_shorts_lookback = susbet_hist_disclosures(
+        lookback_discl, TOP_N_SHORTS, latest_rpt_date
+    )
+    top_sec_shorts_lookback_ = top_sec_shorts_lookback.merge(
+        mkt_data_concat, on=[DATE_COL, TICKER_COL], how="left"
+    )
+    top_fund_shorts_lookback_ = top_fund_shorts_lookback.merge(
+        mkt_data_concat, on=[DATE_COL, TICKER_COL], how="left"
+    )
 
-    top_sec_aug = calc_discl_metrics(top_sec_shorts)
-    top_fund_aug = calc_discl_metrics(top_fund_shorts)
-    return top_sec_aug, top_fund_aug
+    fund_short_metrics = calc_display_metrics(top_fund_shorts_lookback_)
+    sec_short_metrics = calc_display_metrics(top_sec_shorts_lookback_)
+
+    return sec_short_metrics, fund_short_metrics
+
+
+def style_metrics_df(metrics_df):
+    """Style the output metrics df:
+    - format the values according to FORMAT_DICT (currency, percent, floats, dates)
+    - color the headers in blue and rows in alternating colors
+    - add a background gradient for the short position
+    - add bars for the pnl column
+    """
+    even_rows = pd.IndexSlice[::2]
+    return (
+        metrics_df.style.format(formatter=FORMAT_DICT)
+        .bar(subset=[PNL_COL], color="#d65f5f")
+        .set_properties(**{"background-color": ODD_ROW_COL, "border": TBL_BORDER})
+        .set_properties(**{"background-color": EVEN_ROW_COL}, subset=even_rows)
+        .set_table_styles(TBL_STYLES)
+        .background_gradient(subset=SHORT_POS_COL)
+    )
 
 
 def main():
@@ -120,7 +242,7 @@ def main():
 
     logger.info("Calculating metrics...")
     top_sec_aug, top_fund_aug = summarise_short_discl(
-        discl_data, mkt_data, isin_ticker_map, TOP_N_SHORTS
+        discl_data, mkt_data, isin_ticker_map
     )
     logger.info(f"Saving output as JSON to {OUT_FILE}")
     output = {"sec": top_sec_aug, "fund": top_fund_aug}

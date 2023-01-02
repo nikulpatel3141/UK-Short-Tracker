@@ -49,6 +49,8 @@ EXPO_COL = "Exposure"
 PNL_COL = "PnL"
 REL_PNL_COL = "Rel PnL"
 DTC_COL = "Days to Cover"
+EXPO_DIFF_COL = "Exposure Change"
+LOOKBACK_DATE_COL = "Lookback Date"
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"
 OPENFIGI_HEADERS = {"Content-Type": "application/json"}
