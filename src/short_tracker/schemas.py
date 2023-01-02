@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy import Table, Column, Float, String, MetaData, Date, create_engine
 
 from short_tracker.config import CONN_STR
@@ -16,6 +17,8 @@ from short_tracker.data import (
 SHORT_DISCL_TABLE = "uk_short_discl"
 MKT_DATA_TABLE = "market_data"  # OHLC, shares outstanding
 SEC_METADATA_TABLE = "sec_metadata"  # ticker, isin
+
+logger = logging.getLogger(__name__)
 
 md = MetaData()
 
@@ -48,5 +51,6 @@ discl_data_tbl = Table(
 
 def seed_db():
     """Create the database tables specified above"""
+    logger.info(f"Seeding db specified by conn str {CONN_STR}")
     engine = create_engine(CONN_STR)
     md.create_all(engine)
