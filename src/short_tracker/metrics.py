@@ -2,11 +2,18 @@
 
 import json
 import logging
+from short_tracker.utils import n_bdays_ago
 
 from sqlalchemy import create_engine
 import pandas as pd
 
-from short_tracker.config import CONN_STR, UK_MKT_TICKER, TOP_N_SHORTS, OUT_FILE
+from short_tracker.config import (
+    CONN_STR,
+    METRICS_LOOKBACK,
+    UK_MKT_TICKER,
+    TOP_N_SHORTS,
+    OUT_FILE,
+)
 from short_tracker.data import (
     DATE_COL,
     RET_COL,
@@ -80,8 +87,11 @@ def summarise_short_discl(discl_data, mkt_data, isin_ticker_map, top_n):
     per fund and top_n overall shorts.
     """
     latest_rpt_date = discl_data[DATE_COL].max()
+    lookback_date = n_bdays_ago(METRICS_LOOKBACK, latest_rpt_date)
     reindex_dates = calc_reindex_dates(latest_rpt_date)
     mkt_data_concat = prepare_mkt_data(mkt_data, reindex_dates, UK_MKT_TICKER)
+
+    discl_data_ = prepare_discl_data(discl_data, isin_ticker_map)
 
     def calc_discl_metrics(discl_subset):
         discl_data_ = prepare_discl_data(discl_subset, isin_ticker_map)
@@ -90,7 +100,11 @@ def summarise_short_discl(discl_data, mkt_data, isin_ticker_map, top_n):
         )
         return augment_discl_metrics(discl_data_)
 
-    top_sec_shorts, top_fund_shorts = subset_top_shorts(discl_data, top_n)
+    lookback_discl = discl_data[
+        (discl_data[DATE_COL] <= latest_rpt_date)
+        & (discl_data[DATE_COL] >= lookback_date)
+    ]
+    top_sec_shorts, top_fund_shorts = subset_top_shorts(cur_discl, top_n)
 
     top_sec_aug = calc_discl_metrics(top_sec_shorts)
     top_fund_aug = calc_discl_metrics(top_fund_shorts)
