@@ -22,5 +22,6 @@ dependencies = [
     "sqlalchemy==1.4.45",
     "openpyxl",
     "Jinja2",
+    "matplotlib",
 ]
 
