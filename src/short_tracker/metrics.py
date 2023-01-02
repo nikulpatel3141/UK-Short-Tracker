@@ -2,11 +2,11 @@
 
 import json
 import logging
-from short_tracker.utils import n_bdays_ago
 
 from sqlalchemy import create_engine
 import pandas as pd
 
+from short_tracker.utils import n_bdays_ago, setup_logging
 from short_tracker.config import (
     CONN_STR,
     METRICS_LOOKBACK,
@@ -271,3 +271,8 @@ def main():
         json.dump(output, f)
 
     logger.info("Done!")
+
+
+if __name__ == "__main__":
+    setup_logging(logger)
+    main()
