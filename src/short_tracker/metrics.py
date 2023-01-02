@@ -235,7 +235,7 @@ def style_metrics_df(metrics_df, report_date):
     """
 
     return (
-        metrics_df.sort_values(by=SHORT_POS_COL)
+        metrics_df.sort_values(by=SHORT_POS_COL, ascending=False)
         .style.format(formatter=FORMAT_DICT)
         # .bar(subset=[PNL_COL], color="#d65f5f")
         .set_table_styles(TBL_STYLES)
