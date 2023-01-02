@@ -16,7 +16,7 @@ jobs:
         run: python3 -m pip install --user .
       - name: Collect Data
         run: |
-          sudo chmod ug+rw data/data.sqlite
+          sudo chmod ugo+rwx data/data.sqlite
           ls -la data/
           python3 src/short_tracker/data_main.py
       - name: Calculate and Format Results
