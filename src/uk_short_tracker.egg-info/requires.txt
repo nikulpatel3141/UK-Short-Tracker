@@ -1,6 +1,11 @@
 requests
 tenacity
-pandas
+numpy
+pandas>=1.5
 fastparquet
 pandas_datareader
 yfinance
+sqlalchemy==1.4.45
+openpyxl
+Jinja2
+matplotlib
