@@ -233,10 +233,13 @@ def style_metrics_df(metrics_df, report_date):
     caption = f"""
     Top {len(metrics_df)} UK disclosed shorts {caption_info} as of {DATE_FMT(report_date)}
     """
+    metrics_df_ = metrics_df.sort_values(
+        by=SHORT_POS_COL, ascending=False
+    ).reset_index()
 
     return (
-        metrics_df.sort_values(by=SHORT_POS_COL, ascending=False)
-        .style.format(formatter=FORMAT_DICT)
+        metrics_df_.style.format(formatter=FORMAT_DICT)
+        .hide(axis="index")
         # .bar(subset=[PNL_COL], color="#d65f5f")
         .set_table_styles(TBL_STYLES)
         .background_gradient(subset=PNL_COL, cmap="RdYlGn", vmin=-5e5, vmax=5e5)
