@@ -16,6 +16,7 @@ ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
 # earliest time UK equity markets will close, short disclosures to be filed after this
 UK_MKT_EARLY_CLOSE = time(hour=12, minute=30)
 UK_DISCL_THRESHOLD = 0.5
+FCA_DATE_FMT = "%d.%m.%Y"  # format of date in short discl excel
 
 # FIXME: most of these should go in the schema module
 # Columns from UK's FCA short disclosures
@@ -178,7 +179,8 @@ def parse_uk_discl_sheet_names(sheet_names: list) -> tuple[list, datetime.date]:
     if len(rept_dates) != 1:
         raise ValueError(f"Was expecting a single reporting date, not: {rept_dates}")
 
-    rept_date = parse(list(rept_dates)[0]).date()
+    rept_date = list(rept_dates)[0]
+    rept_date = datetime.strptime(rept_date, FCA_DATE_FMT).date()
 
     parsed_names = [x[0].lower() for x in split_sheet_names]
 
