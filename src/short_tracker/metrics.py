@@ -5,6 +5,7 @@ import logging
 
 from sqlalchemy import create_engine
 import pandas as pd
+import numpy as np
 
 from short_tracker.utils import n_bdays_ago, setup_logging
 from short_tracker.config import (
@@ -169,7 +170,7 @@ def calc_display_metrics(lookback_discl_df):
     lookback_discl_df_ = lookback_discl_df.sort_values(by=[TICKER_COL, DATE_COL])
     lookback_discl_df_ = augment_discl_metrics(lookback_discl_df_)
 
-    cumulate_ret = lambda x: (1 + x).cumprod() - 1
+    cumulate_ret = lambda x: np.nanprod(1 + x) - 1
     top_tail_diff = lambda x: x.iloc[0] - x.iloc[-1]
 
     aggfuncs = {
