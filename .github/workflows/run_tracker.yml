@@ -1,7 +1,7 @@
 on:
   workflow_dispatch:
   schedule:
-    - cron: "01 23 1-5 * *"
+    - cron: "01 19 * * 1-5"
 name: Run Short Tracker
 jobs:
   build:
@@ -15,10 +15,7 @@ jobs:
       - name: Build
         run: python3 -m pip install --user -e .
       - name: Collect Data
-        run: |
-          sudo chmod ugo+rwx data/data.sqlite
-          ls -la data/
-          python3 src/short_tracker/data_main.py
+        run: python3 src/short_tracker/data_main.py
       - name: Calculate and Format Results
         run: python3 src/short_tracker/metrics.py
       - uses: mikeal/publish-to-github-action@master
