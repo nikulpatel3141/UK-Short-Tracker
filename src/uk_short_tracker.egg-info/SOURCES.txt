@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 src/short_tracker/__init__.py
 src/short_tracker/config.py
