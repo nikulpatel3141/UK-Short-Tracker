@@ -4,17 +4,17 @@ This repository contains code to display metrics for UK disclosed short position
 
 The process is relatively straightforward:
 1) Download UK Short Disclosures from the FCA website
-  - https://www.fca.org.uk/markets/short-selling/notification-disclosure-net-short-positions
+    - https://www.fca.org.uk/markets/short-selling/notification-disclosure-net-short-positions
 2) The disclosures are identified by ISINs, so query OpenFIGI to get the underlying tickers
 3) Use these tickers to query for market data from Yahoo Finance
-4) For simplicity we save all data to a SQLite database `data/data.sqlite`
-  - This is for keeping the most recent data for disclosures and shares outstanding since these are updated daily and cannot be historically queried
-    - (actually historical disclosures data is available but is difficult to work with. See the Notebooks/hist_scripting.ipynb notebook for more details)
+4) For simplicity we save all data to a SQLite database in [data.sqlite](data/)
+    - This is for keeping the most recent data for disclosures and shares outstanding since these are updated daily and cannot be historically queried
+      - (actually historical disclosures data is available but is difficult to work with. See the Notebooks/hist_scripting.ipynb notebook for more details)
 5) Load the data, calculate all required metrics
-6) Use `pandas.style` to nicely format the tables as HTML and save as a json in `output/output.json`
+6) Use `pandas.style` to nicely format the tables as HTML and save as a json in [output/output.json](output/)
 7) Commit the changes to `data/` and `output/` to the repository
 
-This procedure is scheduled to run using GitHub actions every day using `.github/workflows/run_tracker.yml`.
+This procedure is scheduled to run using GitHub actions every day using [this](.github/workflows/run_tracker.yml) workflow file.
 
 ## Acknowledgements
 
