@@ -51,6 +51,7 @@ PNL_COL = "PnL"
 REL_PNL_COL = "Rel PnL"
 DTC_COL = "Days to Cover"
 EXPO_DIFF_COL = "Exposure Change"
+POS_DIFF_COL = "Position Change (%)"
 LOOKBACK_DATE_COL = "Lookback Date"
 
 OPENFIGI_URL = "https://api.openfigi.com/v3/mapping"

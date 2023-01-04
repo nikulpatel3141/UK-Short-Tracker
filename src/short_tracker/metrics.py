@@ -33,7 +33,7 @@ from short_tracker.data import (
     ISIN_COL,
     SHARE_ISSUER_COL,
     FUND_COL,
-    EXPO_DIFF_COL,
+    POS_DIFF_COL,  # TODO change to pos change instead of expo change
     LOOKBACK_DATE_COL,
 )  # FIXME: too many imports...
 from short_tracker.schemas import (
@@ -52,7 +52,7 @@ from short_tracker.processing import (
 DISPL_COLS = [
     SHORT_POS_COL,
     EXPO_COL,
-    EXPO_DIFF_COL,
+    POS_DIFF_COL,
     RET_COL,
     REL_RET_COL,
     PNL_COL,
@@ -61,9 +61,9 @@ DISPL_COLS = [
     LOOKBACK_DATE_COL,
 ]
 
-GBP_K_COLS = [PNL_COL, REL_PNL_COL, EXPO_DIFF_COL]
+GBP_K_COLS = [PNL_COL, REL_PNL_COL]
 GBP_M_COLS = [EXPO_COL]
-PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL]
+PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL, POS_DIFF_COL]
 FLOAT_COLS = [DTC_COL]
 
 # FIXME: repetition
@@ -181,7 +181,7 @@ def calc_display_metrics(lookback_discl_df):
         # REL_PNL_COL: pd.NamedAgg(column=REL_PNL_COL, aggfunc="sum"),
         DTC_COL: pd.NamedAgg(column=DTC_COL, aggfunc="last"),
         EXPO_COL: pd.NamedAgg(column=EXPO_COL, aggfunc="last"),
-        EXPO_DIFF_COL: pd.NamedAgg(column=EXPO_COL, aggfunc=top_tail_diff),
+        POS_DIFF_COL: pd.NamedAgg(column=SHORT_POS_COL, aggfunc=top_tail_diff),
         LOOKBACK_DATE_COL: pd.NamedAgg(column=DATE_COL, aggfunc="min"),
     }
     return lookback_discl_df_.groupby(grp_cols).agg(**aggfuncs)
