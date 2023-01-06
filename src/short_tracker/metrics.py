@@ -162,7 +162,7 @@ def calc_display_metrics(lookback_discl_df):
     """Aggregates returns, pnl and calculates overall change in exposure
     for the given disclosures, grouped by ticker and also fund if given.
     """
-    grp_cols = [TICKER_COL, SHARE_ISSUER_COL]
+    grp_cols = [TICKER_COL]
 
     if FUND_COL in lookback_discl_df:
         grp_cols = [*grp_cols, FUND_COL]
@@ -174,6 +174,7 @@ def calc_display_metrics(lookback_discl_df):
     top_tail_diff = lambda x: x.iloc[0] - x.iloc[-1]
 
     aggfuncs = {
+        SHARE_ISSUER_COL: pd.NamedAgg(column=SHARE_ISSUER_COL, aggfunc="last"),  # FIXME
         SHORT_POS_COL: pd.NamedAgg(column=SHORT_POS_COL, aggfunc="last"),
         RET_COL: pd.NamedAgg(column=RET_COL, aggfunc=cumulate_ret),
         # REL_RET_COL: pd.NamedAgg(column=REL_RET_COL, aggfunc=cumulate_ret),
