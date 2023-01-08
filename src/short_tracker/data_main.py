@@ -123,6 +123,8 @@ def query_mkt_data_(tickers, report_date) -> pd.DataFrame:
         logger.warning(f"No share outstanding data for tickers: {missing_sh_out}")
 
     sh_out_ = sh_out.rename_axis(TICKER_COL).rename(VALUE_COL).to_frame().reset_index()
+
+    # BUG: actually one trading day ago, but shouldn't make too much of a difference
     sh_out_.loc[:, DATE_COL] = pd.to_datetime(report_date)
     sh_out_.loc[:, ITEM_COL] = SH_OUT_COL
 
@@ -170,15 +172,20 @@ def update_db(
         pd.Series(isin_ticker_map, name=TICKER_COL).rename_axis(ISIN_COL).reset_index()
     )
 
+    date_cond = """
+    {DATE_COL} > '{start_date}'
+    AND {DATE_COL} < '{report_date}'
+    """
+
     existing_shout_query = f"""
-    select * from {MKT_DATA_TABLE}
-    where item = '{SH_OUT_COL}' and
-    {DATE_COL} >= '{start_date}'
+    SELECT * from {MKT_DATA_TABLE}
+    WHERE item = '{SH_OUT_COL}' AND
+    {date_cond}
     """
 
     existing_discl_query = f"""
     select * from {SHORT_DISCL_TABLE}
-    where {DATE_COL} >= '{start_date}'
+    WHERE {date_cond}
     """
 
     existing_shout = pd.read_sql_query(

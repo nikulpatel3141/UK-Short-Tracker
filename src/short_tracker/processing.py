@@ -280,6 +280,9 @@ def calc_adv(volume_data, lookback) -> pd.DataFrame:
 def prepare_discl_data(discl_data, isin_ticker_map):
     """Join on a ticker -> isin mapping and normalise the short position column
     for the given disclosures df.
+
+    Note: no need to shift positions data since positions are labelled with the
+    report date, not the 'as of' date.
     """
     discl_data.loc[:, SHORT_POS_COL] = discl_data.loc[:, SHORT_POS_COL] / 100
 
