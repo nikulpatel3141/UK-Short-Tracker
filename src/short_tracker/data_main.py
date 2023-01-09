@@ -172,7 +172,7 @@ def update_db(
         pd.Series(isin_ticker_map, name=TICKER_COL).rename_axis(ISIN_COL).reset_index()
     )
 
-    date_cond = """
+    date_cond = f"""
     {DATE_COL} > '{start_date}'
     AND {DATE_COL} < '{report_date}'
     """
