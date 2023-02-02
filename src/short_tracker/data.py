@@ -16,7 +16,10 @@ ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
 # earliest time UK equity markets will close, short disclosures to be filed after this
 UK_MKT_EARLY_CLOSE = time(hour=12, minute=30)
 UK_DISCL_THRESHOLD = 0.5
-FCA_DATE_FMT = "%d.%m.%Y"  # format of date in short discl excel
+FCA_DATE_FMT = (
+    "%d.%m.%Y",
+    "%d.%m.%y",
+)  # possible formats of dates in short discl excel
 
 # FIXME: most of these should go in the schema module
 # Columns from UK's FCA short disclosures
@@ -175,13 +178,28 @@ def parse_uk_discl_sheet_names(sheet_names: list) -> tuple[list, datetime.date]:
 
     split_sheet_names = [x.split(" ") for x in sheet_names]
 
-    rept_dates = set([x[2] for x in split_sheet_names])
+    def parse_date(date_str):
+        """The report dates come in various formats, eg 01.01.2020 or 01.01.20
+        This loops over all possible formats found and returns the first one that
+        works.
+
+        #FIXME: this is error prone
+        """
+        for fmt in FCA_DATE_FMT:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except:
+                pass
+        raise ValueError(
+            f"Unable to parse report date {date_str} using possible formats {FCA_DATE_FMT}"
+        )
+
+    rept_dates = set([parse_date(x[2]) for x in split_sheet_names])
 
     if len(rept_dates) != 1:
         raise ValueError(f"Was expecting a single reporting date, not: {rept_dates}")
 
     rept_date = list(rept_dates)[0]
-    rept_date = datetime.strptime(rept_date, FCA_DATE_FMT).date()
 
     parsed_names = [x[0].lower() for x in split_sheet_names]
 
