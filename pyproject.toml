@@ -15,7 +15,7 @@ dependencies = [
     "requests",
     "tenacity",
     "numpy",
-    "pandas>=1.5",
+    "pandas<=1.5",
     "fastparquet",
     "pandas_datareader",
     "yfinance",
