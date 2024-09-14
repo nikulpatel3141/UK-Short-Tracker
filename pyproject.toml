@@ -16,6 +16,7 @@ dependencies = [
     "tenacity",
     "numpy==1.23.5",
     "pandas[excel]==1.5.2",
+    "openpyxl",
     "yfinance",
     "sqlalchemy==1.4.45",
 ]
