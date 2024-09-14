@@ -14,14 +14,9 @@ classifiers = [
 dependencies = [
     "requests",
     "tenacity",
-    "numpy",
-    "pandas<=1.5",
-    "fastparquet",
-    "pandas_datareader",
+    "numpy==1.23.5",
+    "pandas[excel]==1.5.2",
     "yfinance",
     "sqlalchemy==1.4.45",
-    "openpyxl",
-    "Jinja2",
-    "matplotlib",
 ]
 
