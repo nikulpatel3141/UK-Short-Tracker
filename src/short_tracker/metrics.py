@@ -67,15 +67,14 @@ PCT_COLS = [SHORT_POS_COL, RET_COL, REL_RET_COL, POS_DIFF_COL]
 FLOAT_COLS = [DTC_COL]
 
 # FIXME: repetition
-CURR_FMT_K = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
-CURR_FMT_M = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-6):,.1f}M"
-DATE_FMT = lambda x: x.strftime("%y-%m-%d")
+format_ccy_k = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-3):,.0f}k"
+format_ccy_mm = lambda x: f"{'-' if x < 0 else ''}£{abs(x*1e-6):,.1f}M"
+format_date = lambda x: x.strftime("%Y-%m-%d")
 FORMAT_DICT = {
-    **{k: CURR_FMT_K for k in GBP_K_COLS},
-    **{k: CURR_FMT_M for k in GBP_M_COLS},
+    **{k: format_ccy_k for k in GBP_K_COLS},
+    **{k: format_ccy_mm for k in GBP_M_COLS},
     **{k: "{:.1f}" for k in FLOAT_COLS},
     **{k: lambda x: f"{100*x:.1f}%" for k in PCT_COLS},
-    LOOKBACK_DATE_COL: DATE_FMT,
 }
 ODD_ROW_COL = "#d4d4d4"
 EVEN_ROW_COL = "#8c8c8c"
@@ -228,21 +227,18 @@ def style_metrics_df(metrics_df, report_date):
     - add bars for the pnl column
     """
     if FUND_COL not in metrics_df.index.names:
-        caption_info = "(aggregated over securities)"
+        caption_info = "overall"
     else:
-        caption_info = "(per fund + security)"
+        caption_info = "individual"
 
     caption = f"""
-    Top {len(metrics_df)} UK disclosed shorts {caption_info} as of {DATE_FMT(report_date)}
+    Top {len(metrics_df)} {caption_info} disclosed UK shorts as of {format_date(report_date)}
     """
-    metrics_df_ = metrics_df.sort_values(
-        by=SHORT_POS_COL, ascending=False
-    ).reset_index()
+    metrics_df_ = metrics_df.sort_values(by=SHORT_POS_COL, ascending=False).reset_index()
 
     return (
         metrics_df_.style.format(formatter=FORMAT_DICT)
         .hide(axis="index")
-        # .bar(subset=[PNL_COL], color="#d65f5f")
         .set_table_styles(TBL_STYLES)
         .background_gradient(subset=PNL_COL, cmap="RdYlGn", vmin=-5e5, vmax=5e5)
         .set_caption(caption)
