@@ -17,6 +17,7 @@ dependencies = [
     "numpy==1.23.5",
     "pandas[excel, output-formatting]==1.5.2",
     "openpyxl",
+    "matplotlib",
     "Jinja2",
     "yfinance",
     "sqlalchemy==1.4.45",
