@@ -13,7 +13,7 @@ Usage:
 $ python3 query_discl_data.py
 """
 
-from datetime import datetime, timedelta
+import datetime as dt
 import logging
 
 import pandas as pd
@@ -41,11 +41,10 @@ from short_tracker.data import (
     DATE_COL,
     ISIN_COL,
     SH_OUT_COL,
-    MKT_CAP_COL,
     query_uk_si_disclosures,
     query_all_sec_metadata,
     query_mkt_data,
-    query_quotes,
+    query_shares_outstanding,
     SHORT_URL_UK,
 )
 from short_tracker.processing import (
@@ -111,12 +110,12 @@ def query_mkt_data_(tickers, report_date) -> pd.DataFrame:
     mkt_data = {
         tkr: query_mkt_data(qry_tkr, query_start) for tkr, qry_tkr in ticker_map.items()
     }
-    quotes = {tkr: query_quotes(qry_tkr) for tkr, qry_tkr in ticker_map.items()}
-
+    sh_out_dict = {
+        tkr: query_shares_outstanding(qry_tkr) for tkr, qry_tkr in ticker_map.items()
+    }
     mkt_data_ = process_mkt_data(mkt_data)
 
-    quotes_df = pd.DataFrame(quotes)
-    sh_out = quotes_df.loc[SH_OUT_COL]
+    sh_out = pd.Series(sh_out_dict)
     missing_sh_out = list(sh_out[sh_out.isna()].index)
 
     if missing_sh_out:
@@ -154,7 +153,7 @@ def update_db(
     discl_data: pd.DataFrame,
     mkt_data: pd.DataFrame,
     isin_ticker_map: dict,
-    report_date: datetime.date,
+    report_date: dt.date,
 ):
     """Update the database specified by CONN_STR to:
     1 - delete data beyond the allowed data age (specified by MAX_DATA_AGE)

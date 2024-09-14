@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: uk-short-tracker
-Version: 0.0.0
-Summary: Track disclosed UK shorts
-Classifier: Programming Language :: Python :: 3
-Requires-Python: >=3.8
-Description-Content-Type: text/x-rst

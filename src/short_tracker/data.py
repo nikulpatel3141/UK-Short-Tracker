@@ -1,14 +1,13 @@
-import time
-import requests
 import logging
 from datetime import datetime, time
 from dateutil.parser import parse
 from typing import Union
 
-from pandas_datareader import data as pdr
+import requests
 from tenacity import retry, retry_if_exception_type, wait_fixed
 import yfinance as yf
 import pandas as pd
+import numpy as np
 
 SHORT_URL_UK = "https://www.fca.org.uk/publication/data/short-positions-daily-update.xlsx"  # FIXME: this should be somewhere else...
 ALPHA_V_KEY = "0E6I0C40CVTM5U1M"
@@ -268,14 +267,13 @@ def query_uk_si_disclosures(discl_url: str, exp_upd_datetime: datetime = None):
     return dict(zip(parsed_sheet_names, parsed_data)), rept_date
 
 
-def query_quotes(ticker: str) -> Union[pd.Series, None]:
-    """Query for a ticker's financial data, eg market cap etc using Pandas Datareader"""
-    try:
-        data = pdr.get_quote_yahoo(ticker)
-    except IndexError:
-        logger.warning(f"No quote data for ticker {ticker}")
-        return None
-    return data.squeeze()
+def query_shares_outstanding(ticker: str) -> float:
+    ticker_info = yf.Ticker(ticker).get_info()
+
+    for field in ["sharesOutstanding", "impliedSharesOutstanding"]:
+        if (sh_out := ticker_info.get(field)) and isinstance(sh_out, (int, float)):
+            return sh_out
+    return np.nan
 
 
 def query_mkt_data(ticker, start_date, adjust=False) -> Union[pd.DataFrame, None]:
