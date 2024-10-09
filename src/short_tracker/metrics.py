@@ -34,8 +34,7 @@ from short_tracker.data import (
     SHARE_ISSUER_COL,
     FUND_COL,
     POS_DIFF_COL,  # TODO change to pos change instead of expo change
-    LOOKBACK_DATE_COL,
-)  # FIXME: too many imports...
+)
 from short_tracker.schemas import (
     SEC_METADATA_TABLE,
     MKT_DATA_TABLE,
@@ -58,7 +57,6 @@ DISPL_COLS = [
     PNL_COL,
     REL_PNL_COL,
     DTC_COL,
-    LOOKBACK_DATE_COL,
 ]
 
 GBP_K_COLS = [PNL_COL, REL_PNL_COL]
@@ -182,7 +180,6 @@ def calc_display_metrics(lookback_discl_df):
         DTC_COL: pd.NamedAgg(column=DTC_COL, aggfunc="last"),
         EXPO_COL: pd.NamedAgg(column=EXPO_COL, aggfunc="last"),
         POS_DIFF_COL: pd.NamedAgg(column=SHORT_POS_COL, aggfunc=top_tail_diff),
-        LOOKBACK_DATE_COL: pd.NamedAgg(column=DATE_COL, aggfunc="min"),
     }
     return lookback_discl_df_.groupby(grp_cols).agg(**aggfuncs)
 
